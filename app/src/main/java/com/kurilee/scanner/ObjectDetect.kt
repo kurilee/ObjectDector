@@ -11,37 +11,30 @@ import java.io.InputStream
 import java.nio.ByteBuffer
 import java.util.Collections
 
-data class Result(
-    var outputBitmap: Bitmap,
-    var outputBox: Array<FloatArray>
-)
-
 class ObjectDetect {
-    fun detect(byteArray: ByteArray, ortEnv: OrtEnvironment, ortSession: OrtSession): Result {
-        lateinit var result: Result
-//        val rawImageBytes = byteArray;
-        Log.d("ObjectDetect", "shape: ${byteArray.size}")
+    fun detect(byteArray: ByteArray, ortEnv: OrtEnvironment, ortSession: OrtSession): Array<FloatArray> {
         val shape = longArrayOf(byteArray.size.toLong())
         val inputTensor = OnnxTensor.createTensor(ortEnv, ByteBuffer.wrap(byteArray), shape, OnnxJavaType.UINT8)
         inputTensor.use {
             try {
                 val output = ortSession.run(
                     Collections.singletonMap("image", inputTensor),
-                    setOf("image_out", "scaled_box_out_next")
+                    setOf("scaled_box_out_next")
                 )
                 output.use {
-                    val rawOutput = (output?.get(0)?.value) as ByteArray
-                    val boxOutput = (output?.get(1)?.value) as Array<FloatArray>
-                    val outputImageBitmap = byteArrayToBitmap(rawOutput)
+//                    val rawOutput = (output?.get(0)?.value) as ByteArray
+                    val boxOutput = (output.get(0)?.value) as Array<FloatArray>
+//                    val outputImageBitmap = byteArrayToBitmap(rawOutput)
 
-                    result = Result(outputImageBitmap, boxOutput)
+//                    result = Result(outputImageBitmap, boxOutput)
+                    return boxOutput
                 }
             }
             catch (e: Exception) {
                 Log.e("Detect", e.message, e)
             }
         }
-        return result
+        return emptyArray()
     }
 
     private fun byteArrayToBitmap(data: ByteArray): Bitmap {

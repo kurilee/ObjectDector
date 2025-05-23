@@ -9,7 +9,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ImageFormat
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
@@ -23,17 +22,15 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import java.nio.Buffer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -43,7 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var ortEnv: OrtEnvironment = OrtEnvironment.getEnvironment()
     private lateinit var ortSession: OrtSession
 
-    private lateinit var viewFinder: PreviewView
+//    private lateinit var viewFinder: PreviewView
     private lateinit var resultImageView: ImageView
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var classes:List<String>
@@ -68,7 +65,7 @@ class MainActivity : AppCompatActivity() {
         sessionOption.registerCustomOpLibrary(op)
         ortSession = ortEnv.createSession(readModel(), sessionOption)
 
-        viewFinder = findViewById(R.id.preview)
+//        viewFinder = findViewById(R.id.preview)
         resultImageView = findViewById(R.id.imageView)
         resultImageView.setImageBitmap(BitmapFactory.decodeStream(readInputImage()))
 
@@ -98,27 +95,36 @@ class MainActivity : AppCompatActivity() {
         cameraProviderFuture.addListener({
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder()
-                .build()
-                .also {
-                    it.surfaceProvider = viewFinder.surfaceProvider
-                }
+//            val preview = Preview.Builder()
+//                .build()
+//                .also {
+//                    it.surfaceProvider = viewFinder.surfaceProvider
+//                }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             val imageAnalyzer = ImageAnalysis.Builder()
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .setOutputImageRotationEnabled(true)
+                .setResolutionSelector(ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                .build())
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, MyImageAnalyzer { byteArray ->
+                    it.setAnalyzer(ContextCompat.getMainExecutor(this), MyImageAnalyzer { bitmap ->
+//                        val scaledBitmap = bitmap.scale((bitmap.width * ).toInt(), (bitmap.height * 0.75).toInt())
                         try {
-//                              val result = objectDetect.detect(readInputImage().readAllBytes(), ortEnv, ortSession)
-                            val result = objectDetect.detect(byteArray, ortEnv, ortSession)
-                            updateUI(result)
-                            Log.d(TAG, "ok")
+                            val byteArrayOutputStream = ByteArrayOutputStream()
+                            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
+                            val result = objectDetect.detect(
+                                byteArrayOutputStream.toByteArray(),
+                                ortEnv,
+                                ortSession
+                            )
+                            updateUI(bitmap, result)
+                            0
                         } catch (exc: Exception) {
+                            resultImageView.setImageBitmap(bitmap)
                             Log.w(TAG, exc.message!!)
                         }
                     })
@@ -126,7 +132,7 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalyzer)
+                cameraProvider.bindToLifecycle(this, cameraSelector, imageAnalyzer)
             } catch (exc: Exception) {
 
             }
@@ -151,8 +157,8 @@ class MainActivity : AppCompatActivity() {
         return assets.open("test_object_detection_0.jpg")
     }
 
-    private fun updateUI(result: Result) {
-        val mutableBitmap: Bitmap = result.outputBitmap.copy(Bitmap.Config.ARGB_8888, true)
+    private fun updateUI(bitmap: Bitmap, result: Array<FloatArray>) {
+        val mutableBitmap: Bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
 
         val canvas = Canvas(mutableBitmap)
         val paint = Paint()
@@ -160,16 +166,27 @@ class MainActivity : AppCompatActivity() {
         paint.textSize = 28f
         paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_OVER)
 
+        val rectPaint = Paint()
+        rectPaint.color = Color.RED
+        rectPaint.style = Paint.Style.STROKE
+        rectPaint.strokeWidth = 4.0f
+
         canvas.drawBitmap(mutableBitmap, 0.0f, 0.0f, paint)
-        val boxit = result.outputBox.iterator()
+        val boxit = result.iterator()
         while (boxit.hasNext()) {
             val box_info = boxit.next()
-            canvas.drawText("%s:%.2f".format(classes[box_info[5].toInt()], box_info[4]), box_info[0] - box_info[2] / 2, box_info[1] - box_info[3] / 2, paint)
+            canvas.drawText("%s:%.2f".format(classes[box_info[5].toInt()], box_info[4]), box_info[0] - box_info[2] / 2, box_info[1] - box_info[3] / 2 - 10, paint)
+            canvas.drawRect(box_info[0] - box_info[2] / 2, box_info[1] - box_info[3] / 2, box_info[0] + box_info[2] / 2, box_info[1] + box_info[3] / 2, rectPaint)
             Log.d(TAG, "%s:%.2f".format(box_info[5].toInt(), box_info[4]))
         }
 
         resultImageView.setImageBitmap(mutableBitmap)
     }
+
+//    private fun bitmapToByteArray(bitmap: Bitmap) {
+//        val byteBuffer = ByteBuffer.allocate(bitmap.byteCount)
+//        bitmap.copyPixelsToBuffer()
+//    }
 
     companion object {
         private const val TAG = "CameraXBasic"
@@ -180,9 +197,9 @@ class MainActivity : AppCompatActivity() {
 }
 
 
-class MyImageAnalyzer(listener: (stream: ByteArray) -> Int): ImageAnalysis.Analyzer {
+class MyImageAnalyzer(listener: (bitmap: Bitmap) -> Int): ImageAnalysis.Analyzer {
 
-    private val listeners = ArrayList<(rect: ByteArray) -> Int>().apply { listener?.let { add(it) } }
+    private val listeners = ArrayList<(bitmap: Bitmap) -> Int>().apply { listener?.let { add(it) } }
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {
@@ -190,17 +207,7 @@ class MyImageAnalyzer(listener: (stream: ByteArray) -> Int): ImageAnalysis.Analy
             return
         }
 
-        if (image.format == 1) {
-            val bitmap = image.toBitmap()
-
-            val mutableBitmap: Bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-
-            val outputStream = ByteArrayOutputStream()
-            mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-            val jpegBytes = outputStream.toByteArray()
-
-            listeners.forEach { it(jpegBytes) }
-        }
+        listeners.forEach { it(image.toBitmap()) }
 
         image.close()
     }

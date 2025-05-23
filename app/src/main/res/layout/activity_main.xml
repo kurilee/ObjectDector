@@ -8,25 +8,11 @@
     android:contentDescription="@string/test_image_desc"
     tools:context=".MainActivity">
 
-    <LinearLayout
+    <ImageView
+        android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
-
-        <androidx.camera.view.PreviewView
-            android:id="@+id/preview"
-            android:layout_width="wrap_content"
-            android:layout_height="370dp">
-
-        </androidx.camera.view.PreviewView>
-
-        <ImageView
-            android:id="@+id/imageView"
-            android:layout_width="wrap_content"
-            android:layout_height="370dp"
-            android:contentDescription="@string/test_image_desc"
-            tools:srcCompat="@tools:sample/backgrounds/scenic" />
-
-    </LinearLayout>
+        android:contentDescription="@string/test_image_desc"
+        tools:srcCompat="@tools:sample/backgrounds/scenic" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
