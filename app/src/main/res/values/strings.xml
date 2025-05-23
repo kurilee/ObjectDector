@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Scanner</string>
+    <string name="test_image_desc">Test Image</string>
+    <string name="btn_detect_text">Detect</string>
+</resources>
