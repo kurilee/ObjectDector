@@ -15,6 +15,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a"))
+        }
     }
 
     buildTypes {
@@ -41,7 +44,7 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.camera2)
     implementation(libs.onnxruntime.extensions.android)
-    implementation(libs.microsoft.onnxruntime.android)
+    implementation(libs.microsoft.onnxruntime.android.qnn)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)

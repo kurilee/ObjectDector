@@ -1,8 +1,13 @@
 package com.kurilee.scanner
 
+import ai.onnxruntime.OnnxJavaType
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OnnxTensorLike
 import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtLoggingLevel
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.extensions.OrtxPackage
+import ai.onnxruntime.providers.NNAPIFlags
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -27,10 +32,15 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.scale
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.nio.ByteBuffer
+import java.nio.DoubleBuffer
+import java.nio.FloatBuffer
+import java.util.EnumSet
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -60,14 +70,24 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor();
 
         // init onnxruntime
-        val sessionOption: OrtSession.SessionOptions = OrtSession.SessionOptions()
-        val op = OrtxPackage.getLibraryPath()
-        sessionOption.registerCustomOpLibrary(op)
-        ortSession = ortEnv.createSession(readModel(), sessionOption)
+        try {
+            val sessionOption: OrtSession.SessionOptions = OrtSession.SessionOptions()
+            val op = OrtxPackage.getLibraryPath()
+            sessionOption.registerCustomOpLibrary(op)
+            sessionOption.addQnn(mapOf("htp_performance_mode" to "high_performance",
+                "htp_graph_finalization_optimization_mode" to "2"))
+            ortSession = ortEnv.createSession(readModel(), sessionOption)
+        } catch (exc: Exception) {
+            val sessionOption: OrtSession.SessionOptions = OrtSession.SessionOptions()
+            val op = OrtxPackage.getLibraryPath()
+            sessionOption.registerCustomOpLibrary(op)
+            sessionOption.setSessionLogLevel(OrtLoggingLevel.ORT_LOGGING_LEVEL_VERBOSE)
+            ortSession = ortEnv.createSession(readModel(), sessionOption)
+        }
 
 //        viewFinder = findViewById(R.id.preview)
         resultImageView = findViewById(R.id.imageView)
-        resultImageView.setImageBitmap(BitmapFactory.decodeStream(readInputImage()))
+//        resultImageView.setImageBitmap(BitmapFactory.decodeStream(readInputImage()))
 
         // Request camera permissions
         if (allPermissionsGranted()) {
@@ -111,8 +131,7 @@ class MainActivity : AppCompatActivity() {
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
-                    it.setAnalyzer(ContextCompat.getMainExecutor(this), MyImageAnalyzer { bitmap ->
-//                        val scaledBitmap = bitmap.scale((bitmap.width * ).toInt(), (bitmap.height * 0.75).toInt())
+                    it.setAnalyzer(cameraExecutor, MyImageAnalyzer { bitmap ->
                         try {
                             val byteArrayOutputStream = ByteArrayOutputStream()
                             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, byteArrayOutputStream)
@@ -122,10 +141,9 @@ class MainActivity : AppCompatActivity() {
                                 ortSession
                             )
                             updateUI(bitmap, result)
-                            0
                         } catch (exc: Exception) {
                             resultImageView.setImageBitmap(bitmap)
-                            Log.w(TAG, exc.message!!)
+//                            Log.w(TAG, exc.message!!)
                         }
                     })
                 }
@@ -145,7 +163,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun readModel(): ByteArray  {
-        return resources.openRawResource(R.raw.yolov8n_v8).readBytes()
+        return resources.openRawResource(R.raw.yolov11n).readBytes()
     }
 
     private fun readClasses(): List<String> {
@@ -197,9 +215,9 @@ class MainActivity : AppCompatActivity() {
 }
 
 
-class MyImageAnalyzer(listener: (bitmap: Bitmap) -> Int): ImageAnalysis.Analyzer {
+class MyImageAnalyzer(listener: (bitmap: Bitmap) -> Unit): ImageAnalysis.Analyzer {
 
-    private val listeners = ArrayList<(bitmap: Bitmap) -> Int>().apply { listener?.let { add(it) } }
+    private val listeners = ArrayList<(bitmap: Bitmap) -> Unit>().apply { listener?.let { add(it) } }
 
     @OptIn(ExperimentalGetImage::class)
     override fun analyze(image: ImageProxy) {

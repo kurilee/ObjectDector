@@ -21,7 +21,7 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
-microsoft-onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android",  version.ref="onnxruntimeAndroid" }
+microsoft-onnxruntime-android-qnn = { module = "com.microsoft.onnxruntime:onnxruntime-android-qnn",  version.ref="onnxruntimeAndroid" }
 onnxruntime-extensions-android = { module = "com.microsoft.onnxruntime:onnxruntime-extensions-android", version.ref="onnxruntimeAndroid" }
 camerax-core = { module = "androidx.camera:camera-core", version.ref="cameraxStable" }
 camerax-view = { module = "androidx.camera:camera-view", version.ref="cameraxStable" }

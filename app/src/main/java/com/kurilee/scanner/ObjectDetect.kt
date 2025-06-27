@@ -19,14 +19,10 @@ class ObjectDetect {
             try {
                 val output = ortSession.run(
                     Collections.singletonMap("image", inputTensor),
-                    setOf("scaled_box_out_next")
+                    setOf("nms_output_with_scaled_boxes_and_keypoints")
                 )
                 output.use {
-//                    val rawOutput = (output?.get(0)?.value) as ByteArray
                     val boxOutput = (output.get(0)?.value) as Array<FloatArray>
-//                    val outputImageBitmap = byteArrayToBitmap(rawOutput)
-
-//                    result = Result(outputImageBitmap, boxOutput)
                     return boxOutput
                 }
             }
@@ -35,9 +31,5 @@ class ObjectDetect {
             }
         }
         return emptyArray()
-    }
-
-    private fun byteArrayToBitmap(data: ByteArray): Bitmap {
-        return BitmapFactory.decodeByteArray(data, 0, data.size)
     }
 }
